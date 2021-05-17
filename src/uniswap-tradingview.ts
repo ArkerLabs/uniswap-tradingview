@@ -33,6 +33,23 @@ export const GET_BLOCKS = (timestamps) => {
     return gql(queryString)
   }
 
+export const SUBGRAPH_HEALTH = gql`
+  query health {
+    indexingStatusForCurrentVersion(subgraphName: "uniswap/uniswap-v2") {
+      synced
+      health
+      chains {
+        chainHeadBlock {
+          number
+        }
+        latestBlock {
+          number
+        }
+      }
+    }
+  }
+`
+
 export class UniswapTradingview {
 
     private lastChart: IChartApi;
@@ -46,7 +63,7 @@ export class UniswapTradingview {
         container: string | HTMLElement,
         options: DeepPartial<ChartOptions>,
         pairAddress: string,
-        interval: '1d' | '1w' | '1m' | 'ALL',
+        interval: '1d' | '1w' | '1m' | '1yr',
         type: 'LINE' | 'CANDLE',
     ): Promise<void> {
 
@@ -54,10 +71,8 @@ export class UniswapTradingview {
             container,
             options,
             async () => {
-                const timestamp = Math.round(new Date().getTime() / 1000);
-                const from = timestamp - (7 * 24 * 3600); // 7 days
-                const data = await this.getHourlyRateData(pairAddress.toLowerCase(), from, type);
-                return data.sort((a,b) => (a.time > b.time) ? 1 : ((b.time > a.time) ? -1 : 0));
+                const data = await this.getHourlyRateData(pairAddress.toLowerCase(), type, interval);
+                return data;
             },
             type
         );
@@ -151,17 +166,42 @@ export class UniswapTradingview {
         return blocks
     }
 
-    private async getHourlyRateData(pairAddress, startTime, type: 'LINE' | 'CANDLE') {
-      try {
+    private getTimestamps(startTime, interval) {
         const utcEndTime = dayjs.utc();
-        let time = startTime
-    
-        // create an array of hour start times until we reach current hour
+        let time = startTime;    
         const timestamps = []
         while (time <= utcEndTime.unix()) {
           timestamps.push(time)
-          time += 3600
+          time += interval
         }
+        return timestamps;
+    }
+
+    private async getLatestBlock(): Promise<string> {
+        return (await request('https://api.thegraph.com/index-node/graphql', SUBGRAPH_HEALTH)).indexingStatusForCurrentVersion.chains[0].latestBlock.number;
+    }
+
+    private async getHourlyRateData(pairAddress, type: 'LINE' | 'CANDLE', interval: '1d' | '1w' | '1m' | '1yr') {
+      try {
+        
+        const timestamp = Math.round(new Date().getTime() / 1000);
+
+        let timestamps = [];
+
+        if (interval == '1d') {
+            const startTime = timestamp - (24 * 3600); // 1 day
+            timestamps = this.getTimestamps(startTime, 600);
+        } else if (interval == '1w') {
+            const startTime = timestamp - (7 * 24 * 3600); // 7 days
+            timestamps = this.getTimestamps(startTime, 3600);
+        } else if (interval == '1m') {
+            const startTime = timestamp - (31 * 24 * 3600); // 31 days
+            timestamps = this.getTimestamps(startTime, 3600);
+        } else if (interval == '1yr') {
+            const startTime = timestamp - (365 * 24 * 3600); // 365 days
+            timestamps = this.getTimestamps(startTime, 24 * 3600);
+        }
+        
     
         // backout if invalid timestamp format
         if (timestamps.length === 0) {
@@ -174,6 +214,13 @@ export class UniswapTradingview {
         // catch failing case
         if (!blocks || blocks?.length === 0) {
           return []
+        }
+
+        const latestBlock = await this.getLatestBlock();
+        if (latestBlock) {
+            blocks = blocks.filter((b) => {
+              return parseFloat(b.number) <= parseFloat(latestBlock)
+            })
         }
     
         const result = await this.splitQuery(HOURLY_PAIR_RATES, 'DEX', [pairAddress], blocks, 100)
@@ -191,6 +238,9 @@ export class UniswapTradingview {
           }
         }
 
+        values = values.sort((a,b) => (a.timestamp > b.timestamp) ? 1 : ((b.timestamp > a.timestamp) ? -1 : 0));
+
+
         if (type == 'LINE') {
             let linear = [];
             for (let i = 0; i < values.length - 1; i++) {
@@ -203,7 +253,6 @@ export class UniswapTradingview {
         }
     
         let formattedHistoryRate0 = []
-        // for each hour, construct the open and close price
         for (let i = 0; i < values.length - 1; i++) {
             const rate0 = parseFloat(values[i].rate0);
             const rate0Next = parseFloat(values[i + 1].rate0);
