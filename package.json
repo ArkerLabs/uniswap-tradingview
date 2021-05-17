@@ -1,0 +1,45 @@
+{
+  "name": "uniswap-tradingview",
+  "version": "1.0.0",
+  "description": "Financial charts using data from Uniswap and other DEXs. ",
+  "main": "index.js",
+  "scripts": {
+    "prebuild": "rm -rf dist",
+    "build": "tsc -p tsconfig.build.json",
+    "prepublish:npm": "npm run build",
+    "publish:npm": "npm publish --access public",
+    "prepublish:next": "npm run build",
+    "publish:next": "npm publish --access public --tag next",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build-example": "webpack"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArkerLabs/uniswap-tradingview.git"
+  },
+  "keywords": [
+    "uniswap",
+    "tradinview",
+    "charts",
+    "dex"
+  ],
+  "author": "Nytyr",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ArkerLabs/uniswap-tradingview/issues"
+  },
+  "homepage": "https://github.com/ArkerLabs/uniswap-tradingview#readme",
+  "devDependencies": {
+    "@webpack-cli/init": "^1.1.3",
+    "typescript": "^4.2.4",
+    "webpack": "^4.44.1",
+    "webpack-cli": "^3.3.12"
+  },
+  "dependencies": {
+    "dayjs": "^1.10.4",
+    "graphql": "^15.5.0",
+    "graphql-request": "^3.4.0",
+    "graphql-tag": "^2.12.4",
+    "lightweight-charts": "^3.3.0"
+  }
+}
