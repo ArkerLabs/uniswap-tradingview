@@ -1,6 +1,6 @@
 {
   "name": "uniswap-tradingview",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Financial charts using data from Uniswap and other DEXs. ",
   "main": "index.js",
   "scripts": {
